@@ -22,6 +22,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://shuang229.xyz"),
   title: {
     default: `${profile.name} — ${profile.role}`,
     template: `%s · ${profile.name}`,
@@ -29,11 +30,19 @@ export const metadata: Metadata = {
   description: profile.summary,
   keywords: ["独立开发", "maker", "side project", profile.name, profile.handle],
   authors: [{ name: profile.name }],
+  // 分享卡片：只留标题 + 手绘大图，不带文案
   openGraph: {
     title: `${profile.name} — ${profile.role}`,
-    description: profile.summary,
     type: "website",
     locale: "zh_CN",
+    url: "https://shuang229.xyz",
+    siteName: profile.name,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "小双的手绘名片" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${profile.name} — ${profile.role}`,
+    images: ["/og.png"],
   },
 };
 
