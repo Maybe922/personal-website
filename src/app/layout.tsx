@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   // 分享卡片：只留标题 + 手绘大图，不带文案（显式置空防止继承 description）
   openGraph: {
     title: `${profile.name} — ${profile.role}`,
-    description: "",
+    description: " ",
     type: "website",
     locale: "zh_CN",
     url: "https://shuang229.xyz",
