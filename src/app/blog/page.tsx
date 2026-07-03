@@ -159,7 +159,7 @@ export default function BlogIndex() {
                       <div className="rounded-[1.25rem] border border-hair bg-surface p-6 shadow-soft transition-shadow duration-300 group-hover:shadow-lift sm:p-7">
                         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
                           <div className="min-w-0 flex-1">
-                            <h2 className="font-display text-2xl font-semibold tracking-tight text-ink transition-colors duration-200 group-hover:text-grass-deep">
+                            <h2 className="break-words font-display text-2xl font-semibold tracking-tight text-ink transition-colors duration-200 group-hover:text-grass-deep">
                               {post.title}
                             </h2>
                             <p className="mt-2.5 text-pretty leading-relaxed text-ink-soft">

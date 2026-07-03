@@ -198,7 +198,10 @@ function timestampSlug() {
   return `post-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-/** 从正文抽第一段普通文字当摘要（跳过标题/图片/代码块/列表等） */
+/**
+ * 从正文抽第一段普通文字当摘要（跳过标题/图片/代码块/列表等）。
+ * 整句都用进摘要时把 rawLine 一并返回，调用方可从正文删掉避免和摘要重复。
+ */
 function extractExcerpt(body) {
   let inFence = false;
   for (const raw of body.split(/\r?\n/)) {
@@ -214,9 +217,11 @@ function extractExcerpt(body) {
       .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
       .replace(/[*_`~]/g, "")
       .trim();
-    if (text) return text.slice(0, 80);
+    if (text) {
+      return { text: text.slice(0, 80), rawLine: text.length <= 80 ? raw : null };
+    }
   }
-  return "（待补摘要）";
+  return { text: "（待补摘要）", rawLine: null };
 }
 
 /**
@@ -243,7 +248,7 @@ export function ensureFrontmatter(md, fallbackTitle) {
       added.push("date");
     }
     if (!hasField(fm, "excerpt")) {
-      extra += `excerpt: ${JSON.stringify(extractExcerpt(body))}\n`;
+      extra += `excerpt: ${JSON.stringify(extractExcerpt(body).text)}\n`;
       added.push("excerpt");
     }
     const rawTitle = (fm.match(/^title\s*:\s*(.+)$/m) || [])[1];
@@ -262,12 +267,15 @@ export function ensureFrontmatter(md, fallbackTitle) {
     title = h1[1].trim();
     body = body.replace(h1[0], "").replace(/^\s+/, "");
   }
+  // 摘要会在页面上当开头导语展示；整句抽走时从正文删掉，免得连着念两遍
+  const excerpt = extractExcerpt(body);
+  if (excerpt.rawLine) body = body.replace(excerpt.rawLine, "").replace(/\n{3,}/g, "\n\n");
   const fm = [
     "---",
     `title: ${JSON.stringify(title)}`,
     `date: ${today}`,
     "tags: []",
-    `excerpt: ${JSON.stringify(extractExcerpt(body))}`,
+    `excerpt: ${JSON.stringify(excerpt.text)}`,
     "---",
     "",
   ].join("\n");
@@ -292,9 +300,13 @@ async function handleMarkdown(chatId, doc, caption) {
   const buf = await downloadFile(doc.file_id, MAX_MD_BYTES);
   if (!buf) return send(chatId, "❌ 文件拉不下来（或超过 1MB），再发一次试试");
 
+  // 文件名兜底当标题：下划线/连字符还原成空格，去掉尾部杂点
   const fallbackTitle = String(doc.file_name || "未命名")
     .replace(/\.md$/i, "")
-    .replace(/[.\s]+$/, "");
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[.\s]+$/, "")
+    .trim() || "未命名";
   const { md, title, added } = ensureFrontmatter(buf.toString("utf8"), fallbackTitle);
 
   const slug = toSlug(caption) || toSlug(doc.file_name) || timestampSlug();

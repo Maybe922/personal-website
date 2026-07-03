@@ -146,6 +146,8 @@ body {
   font-size: 1.125rem;
   line-height: 1.9;
   color: var(--color-ink-soft);
+  /* 长英文串 / URL 不许把版面撑出横向滚动 */
+  overflow-wrap: break-word;
 }
 .post-body > * + * {
   margin-top: 1.25em;

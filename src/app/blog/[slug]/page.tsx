@@ -59,7 +59,7 @@ export default async function BlogPost({
             >
               {stampDate(post.date)}
             </time>
-            <h1 className="mt-5 text-balance font-display text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
+            <h1 className="mt-5 break-words text-balance font-display text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-5xl">
               {post.title}
             </h1>
             <div className="mt-5 flex flex-wrap gap-2">
