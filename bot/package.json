@@ -1,0 +1,12 @@
+{
+  "name": "website-bot",
+  "private": true,
+  "type": "module",
+  "description": "个人网站的 Telegram bot：传 md 发博客、传图存封面、/fans 同步粉丝数",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  }
+}
