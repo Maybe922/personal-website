@@ -496,8 +496,9 @@ async function loop() {
   }
 }
 
-// 直接运行才启动主循环；被 import（比如跑测试）时不动
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+// 测试 import 时设 BOT_SKIP_START=1 跳过；其余情况一律启动
+// （不能用 process.argv[1] 判断主入口：pm2 fork 模式下它指向 pm2 的包装脚本）
+if (process.env.BOT_SKIP_START !== "1") {
   if (!TOKEN || !OWNER_ID) {
     console.error("缺 TG_BOT_TOKEN 或 TG_ALLOWED_USER_ID，bot 不启动");
     process.exit(1);
