@@ -1,0 +1,352 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* ------------------------------------------------------------------ *
+ * Design tokens — "Fresh maker studio"
+ * Light, rounded, optimistic. Grass green primary + warm peach accent
+ * on a warm off-white canvas. Tokens here become Tailwind utilities
+ * (e.g. --color-grass -> bg-grass / text-grass, --font-display -> font-display).
+ * ------------------------------------------------------------------ */
+@theme {
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
+
+  /* Canvas + ink */
+  --color-canvas: oklch(0.982 0.007 95);
+  --color-canvas-deep: oklch(0.955 0.012 92);
+  --color-ink: oklch(0.24 0.021 264);
+  --color-ink-soft: oklch(0.45 0.02 264);
+  --color-ink-faint: oklch(0.62 0.018 264);
+
+  /* Grass — primary */
+  --color-grass: oklch(0.7 0.158 151);
+  --color-grass-deep: oklch(0.58 0.148 152);
+  --color-grass-soft: oklch(0.94 0.05 151);
+
+  /* Peach — secondary accent */
+  --color-peach: oklch(0.82 0.11 55);
+  --color-peach-deep: oklch(0.72 0.14 45);
+  --color-peach-soft: oklch(0.95 0.04 60);
+
+  /* Sky — tertiary tint for variety */
+  --color-sky: oklch(0.83 0.09 230);
+
+  --color-hair: oklch(0.9 0.008 264);
+
+  --shadow-soft: 0 1px 2px oklch(0.24 0.02 264 / 0.04), 0 8px 24px -12px oklch(0.24 0.02 264 / 0.14);
+  --shadow-lift: 0 2px 4px oklch(0.24 0.02 264 / 0.05), 0 24px 48px -20px oklch(0.24 0.02 264 / 0.22);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ------------------------------------------------------------------ *
+ * Retint HeroUI v3 semantic tokens to match the palette.
+ * Unlayered, so these win over HeroUI's @layer base defaults.
+ * ------------------------------------------------------------------ */
+:root,
+.light,
+[data-theme="light"] {
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+
+  --accent: oklch(0.66 0.152 152);
+  --accent-foreground: oklch(0.99 0.01 150);
+  --accent-hover: oklch(0.6 0.15 152);
+  --accent-soft: oklch(0.94 0.05 151);
+  --accent-soft-foreground: oklch(0.4 0.11 152);
+  --accent-soft-hover: oklch(0.91 0.06 151);
+
+  --link: oklch(0.55 0.14 152);
+  --focus: oklch(0.66 0.152 152);
+
+  --radius: 0.85rem;
+}
+
+/* ------------------------------------------------------------------ *
+ * Base
+ * ------------------------------------------------------------------ */
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-grass-soft);
+  color: var(--color-grass-deep);
+}
+
+/* ------------------------------------------------------------------ *
+ * Atmosphere — subtle grain overlay + reusable helpers
+ * ------------------------------------------------------------------ */
+@layer utilities {
+  /* Fine grain texture, fixed so it reads as paper across scroll */
+  .grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Dotted grid backdrop used behind editorial sections */
+  .dot-grid {
+    background-image: radial-gradient(var(--color-hair) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Animated underline for text links */
+  .link-underline {
+    background-image: linear-gradient(var(--color-grass-deep), var(--color-grass-deep));
+    background-size: 0% 2px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.3s var(--ease-out-expo);
+  }
+  .link-underline:hover {
+    background-size: 100% 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Blog post body — Markdown 正文排版（.post-body 由 MarkdownBody 输出）
+ * ------------------------------------------------------------------ */
+.post-body {
+  font-size: 1.125rem;
+  line-height: 1.9;
+  color: var(--color-ink-soft);
+}
+.post-body > * + * {
+  margin-top: 1.25em;
+}
+.post-body h2 {
+  margin-top: 2em;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+  /* 荧光笔下划线 */
+  background-image: linear-gradient(
+    transparent 72%,
+    oklch(0.7 0.158 151 / 0.45) 72%
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  width: fit-content;
+  padding-right: 0.2em;
+}
+.post-body h3 {
+  margin-top: 1.6em;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.post-body a {
+  color: var(--color-grass-deep);
+  background-image: linear-gradient(var(--color-grass-deep), var(--color-grass-deep));
+  background-size: 100% 1.5px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+}
+.post-body strong {
+  color: var(--color-ink);
+}
+.post-body ul,
+.post-body ol {
+  padding-left: 1.4em;
+}
+.post-body ul {
+  list-style: disc;
+}
+.post-body ol {
+  list-style: decimal;
+}
+.post-body li + li {
+  margin-top: 0.4em;
+}
+.post-body li::marker {
+  color: var(--color-grass-deep);
+}
+/* 引用块 = 贴在正文里的橙色便签 */
+.post-body blockquote {
+  padding: 0.9em 1.2em;
+  border-left: 4px solid var(--color-peach);
+  border-radius: 0.5rem;
+  background: var(--color-peach-soft);
+  color: var(--color-ink);
+}
+.post-body blockquote > * + * {
+  margin-top: 0.6em;
+}
+/* 代码 */
+.post-body :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border-radius: 0.35em;
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.post-body pre {
+  overflow-x: auto;
+  padding: 1.1em 1.3em;
+  border: 1px solid var(--color-hair);
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+  font-size: 0.85em;
+  line-height: 1.7;
+}
+.post-body pre code.hljs {
+  padding: 0;
+  background: transparent;
+}
+.post-body img {
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-hair);
+}
+.post-body hr {
+  border: 0;
+  border-top: 2px dashed oklch(0.24 0.021 264 / 0.15);
+}
+.post-body table {
+  width: 100%;
+  font-size: 0.95em;
+  border-collapse: collapse;
+}
+.post-body th,
+.post-body td {
+  padding: 0.5em 0.8em;
+  border: 1px solid var(--color-hair);
+  text-align: left;
+}
+.post-body th {
+  background: var(--color-canvas-deep);
+  color: var(--color-ink);
+}
+
+/* Header wordmark: the green dot hops like a bouncing ball every few seconds */
+@keyframes logo-dot-hop {
+  0%,
+  58%,
+  100% {
+    transform: translateY(0);
+  }
+  66% {
+    transform: translateY(-0.32em);
+  }
+  74% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-0.12em);
+  }
+  86% {
+    transform: translateY(0);
+  }
+}
+.logo-dot {
+  display: inline-block;
+  animation: logo-dot-hop 3.4s ease-in-out infinite;
+}
+
+/* Signal board: the LIVE dot breathes like an on-air light */
+@keyframes signal-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+.signal-live-dot {
+  animation: signal-breathe 2.4s ease-in-out infinite;
+}
+
+/* Entrance animation, opt-in via .reveal (respects reduced-motion above) */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.reveal {
+  animation: reveal-up 0.7s var(--ease-out-expo) both;
+}
+
+/* Idle bob + gentle wobble for the hero mascot — pivots at the feet */
+@keyframes hero-bob {
+  0% {
+    transform: translateY(0) rotate(-1.2deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(1.2deg);
+  }
+  100% {
+    transform: translateY(0) rotate(-1.2deg);
+  }
+}
+.hero-bob {
+  transform-origin: 50% 92%;
+  animation: hero-bob 5s ease-in-out infinite;
+  will-change: transform;
+}
+.hero-bob:hover {
+  animation-duration: 2.2s;
+}
+
+/* ground shadow shrinks/fades in sync with the bob */
+@keyframes hero-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.82);
+    opacity: 0.55;
+  }
+}
+.hero-shadow {
+  animation: hero-shadow 5s ease-in-out infinite;
+}

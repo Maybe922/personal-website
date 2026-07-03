@@ -1,0 +1,119 @@
+/* 「关于我」入场动画：逐行浮现 / 荧光笔划过 / logo 弹跳。
+   触发条件：InViewGroup 在根节点上写入 data-inview。 */
+
+.root .line {
+  opacity: 0;
+}
+.root[data-inview] .line {
+  animation: rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0s);
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate(var(--dx, 0), 12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.root .label {
+  clip-path: inset(0 100% 0 0);
+}
+.root[data-inview] .label {
+  animation: sweep 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0s);
+}
+@keyframes sweep {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.root .logo {
+  opacity: 0;
+}
+.root[data-inview] .logo {
+  animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--d, 0s);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.zzz {
+  transform-box: fill-box;
+}
+.root[data-inview] .zzz {
+  animation: snore 2.8s ease-in-out infinite;
+}
+@keyframes snore {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(1.5px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1.5px);
+  }
+}
+
+/* 插画里两个 AI logo 的轻浮动（错开时长避免同步感） */
+.floatA {
+  animation: drift 3.6s ease-in-out infinite;
+}
+.floatB {
+  animation: driftSpin 4.4s ease-in-out infinite;
+}
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+@keyframes driftSpin {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(7deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root .line,
+  .root .label,
+  .root .logo,
+  .root .zzz {
+    opacity: 1;
+    clip-path: none;
+    animation: none;
+  }
+  .root[data-inview] .line,
+  .root[data-inview] .label,
+  .root[data-inview] .logo,
+  .root[data-inview] .zzz {
+    animation: none;
+  }
+  .floatA,
+  .floatB {
+    animation: none;
+  }
+}
