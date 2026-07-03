@@ -248,7 +248,12 @@ export function ensureFrontmatter(md, fallbackTitle) {
       added.push("date");
     }
     if (!hasField(fm, "excerpt")) {
-      extra += `excerpt: ${JSON.stringify(extractExcerpt(body).text)}\n`;
+      // Obsidian 剪藏自带 summary，比抽正文第一句更准
+      const summary = (fm.match(/^summary\s*:\s*(.+)$/m) || [])[1];
+      const excerpt = summary
+        ? summary.trim().replace(/^["']|["']$/g, "")
+        : extractExcerpt(body).text;
+      extra += `excerpt: ${JSON.stringify(excerpt)}\n`;
       added.push("excerpt");
     }
     const rawTitle = (fm.match(/^title\s*:\s*(.+)$/m) || [])[1];
