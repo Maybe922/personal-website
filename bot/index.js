@@ -4,7 +4,14 @@
 //   2. 发图片 → 存到 public/blog/，回你封面路径，贴进 frontmatter 就能用
 //   3. /fans 小红书 6100 → 同步「全平台信号台」粉丝数（写 gta6 挑战站的库）
 // 只认主人（TG_ALLOWED_USER_ID），别人发消息一律拒绝。
-import { writeFileSync, readdirSync, existsSync, mkdirSync } from "node:fs";
+import {
+  writeFileSync,
+  readdirSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  unlinkSync,
+} from "node:fs";
 import { join, basename } from "node:path";
 import Database from "better-sqlite3";
 
@@ -300,6 +307,47 @@ async function handleImage(chatId, msg) {
   );
 }
 
+// ── 删除文章（/del，二次确认防手滑） ────────────────────
+async function handleDel(chatId, text) {
+  const args = text.replace(/^\/del\b/, "").trim().split(/\s+/).filter(Boolean);
+  const [rawSlug, confirm] = args;
+  if (!rawSlug) return send(chatId, "格式：/del 文章slug\n先发 /posts 看看都有哪些");
+
+  // slug 只可能是 toSlug 产出的字符集，其余一律拒绝，杜绝路径逃逸
+  if (!/^[a-z0-9-]+$/.test(rawSlug)) return send(chatId, `⚠️ 没有这样的 slug「${rawSlug}」`);
+  const target = join(POSTS_DIR, `${rawSlug}.md`);
+  if (!existsSync(target)) {
+    return send(chatId, `找不到「${rawSlug}」～ 发 /posts 核对一下`);
+  }
+
+  let title = rawSlug;
+  try {
+    const m = readFileSync(target, "utf8").match(/^title\s*:\s*(.+)$/m);
+    if (m) title = m[1].trim().replace(/^["']|["']$/g, "");
+  } catch (_) {}
+
+  if (confirm !== "yes") {
+    return send(
+      chatId,
+      `⚠️ 要删《${title}》吗？删了就没了！\n\n确认请发：/del ${rawSlug} yes`
+    );
+  }
+
+  try {
+    unlinkSync(target);
+  } catch (e) {
+    console.error("[bot] 删文章失败", e);
+    return send(chatId, "❌ 没删掉，稍后再试");
+  }
+  const refreshed = await refreshSite();
+  return send(
+    chatId,
+    [`🗑️ 已删除《${title}》`, refreshed ? "" : "（页面刷新没成功，稍等缓存过期或喊我看看）"]
+      .filter(Boolean)
+      .join("\n")
+  );
+}
+
 // ── 文章清单（/posts） ──────────────────────────────────
 function handlePosts(chatId) {
   let files;
@@ -327,6 +375,7 @@ function helpText() {
     "/fans   看各平台粉丝数",
     "/fans 小红书 6100   同步粉丝数（可一次发多行）",
     "/posts  看已发布的文章",
+    "/del 文章slug   删除文章（会先让你确认）",
     "/help   看帮助",
   ].join("\n");
 }
@@ -350,6 +399,7 @@ async function handleMessage(msg) {
   if (!text) return;
   if (text === "/start" || text === "/help") return send(chatId, helpText());
   if (text === "/posts") return handlePosts(chatId);
+  if (text === "/del" || text.startsWith("/del ")) return handleDel(chatId, text);
   if (text === "/fans" || text.startsWith("/fans ") || text.startsWith("/fans\n")) {
     return handleFans(chatId, text);
   }
