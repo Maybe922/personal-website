@@ -51,7 +51,7 @@ export default async function BlogPost({
       <main className="dot-grid relative z-10">
         <BlogCorners backHref="/blog" backLabel="返回日志本" />
 
-        <article className="mx-auto max-w-2xl px-5 pt-28 sm:pt-32">
+        <article className="mx-auto max-w-3xl px-5 pt-28 sm:pt-32">
           <header className="border-b border-dashed border-ink/20 pb-8">
             <time
               dateTime={post.date}
@@ -111,7 +111,7 @@ export default async function BlogPost({
           </div>
         </article>
 
-        <div className="mx-auto max-w-2xl px-5 pb-24">
+        <div className="mx-auto max-w-3xl px-5 pb-24">
           <Link
             href="/blog"
             className="group block rounded-[1.25rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grass focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
