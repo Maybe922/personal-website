@@ -198,33 +198,80 @@ function timestampSlug() {
   return `post-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-const FRONTMATTER_TEMPLATE = [
-  "文章开头需要 frontmatter（至少 title / date / excerpt）：",
-  "",
-  "---",
-  'title: "文章标题"',
-  "date: 2026-07-03",
-  "tags: [标签1, 标签2]",
-  'excerpt: "一句话摘要，会显示在列表卡片上"',
-  'cover: "/blog/xxx.webp"   # 可选，先发图片给我拿路径',
-  "---",
-  "",
-  "正文 Markdown……",
-].join("\n");
-
-/** 粗验 frontmatter：够不够发布（不追求完整 YAML 解析，缺啥直接告诉人） */
-function checkFrontmatter(md) {
-  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!m) return { error: "开头缺 frontmatter～\n\n" + FRONTMATTER_TEMPLATE };
-  const fm = m[1];
-  const missing = ["title", "date", "excerpt"].filter(
-    (k) => !new RegExp(`^${k}\\s*:\\s*\\S`, "m").test(fm)
-  );
-  if (missing.length) {
-    return { error: `frontmatter 缺字段：${missing.join("、")}\n\n` + FRONTMATTER_TEMPLATE };
+/** 从正文抽第一段普通文字当摘要（跳过标题/图片/代码块/列表等） */
+function extractExcerpt(body) {
+  let inFence = false;
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || !line) continue;
+    if (/^(#|!\[|>|\||[-*+]\s|\d+\.\s|---)/.test(line)) continue;
+    const text = line
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/[*_`~]/g, "")
+      .trim();
+    if (text) return text.slice(0, 80);
   }
-  const title = (fm.match(/^title\s*:\s*(.+)$/m) || [])[1] || "";
-  return { title: title.trim().replace(/^["']|["']$/g, "") };
+  return "（待补摘要）";
+}
+
+/**
+ * 保证文章带够发布用的 frontmatter：缺 title/date/excerpt 就自动补，
+ * 完全没有 frontmatter 也能发（标题取第一个 # 大标题或文件名）。
+ * 返回 { md, title, added }，added 是自动补上的字段名列表。
+ */
+export function ensureFrontmatter(md, fallbackTitle) {
+  const today = ymdStr(new Date());
+  const hasField = (fm, k) => new RegExp(`^${k}\\s*:\\s*\\S`, "m").test(fm);
+  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+
+  if (m) {
+    const fm = m[1];
+    const body = md.slice(m[0].length);
+    const added = [];
+    let extra = "";
+    if (!hasField(fm, "title")) {
+      extra += `title: ${JSON.stringify(fallbackTitle)}\n`;
+      added.push("title");
+    }
+    if (!hasField(fm, "date")) {
+      extra += `date: ${today}\n`;
+      added.push("date");
+    }
+    if (!hasField(fm, "excerpt")) {
+      extra += `excerpt: ${JSON.stringify(extractExcerpt(body))}\n`;
+      added.push("excerpt");
+    }
+    const rawTitle = (fm.match(/^title\s*:\s*(.+)$/m) || [])[1];
+    const title = rawTitle
+      ? rawTitle.trim().replace(/^["']|["']$/g, "")
+      : fallbackTitle;
+    if (!added.length) return { md, title, added };
+    return { md: `---\n${fm}\n${extra}---\n${body}`, title, added };
+  }
+
+  // 完全没有 frontmatter：标题取第一个 # 大标题（并从正文去掉，免得页面标题重复）
+  let body = md;
+  let title = fallbackTitle;
+  const h1 = body.match(/^\s*#\s+(.+?)\s*$/m);
+  if (h1) {
+    title = h1[1].trim();
+    body = body.replace(h1[0], "").replace(/^\s+/, "");
+  }
+  const fm = [
+    "---",
+    `title: ${JSON.stringify(title)}`,
+    `date: ${today}`,
+    "tags: []",
+    `excerpt: ${JSON.stringify(extractExcerpt(body))}`,
+    "---",
+    "",
+  ].join("\n");
+  return { md: fm + body, title, added: ["title", "date", "tags", "excerpt"] };
 }
 
 async function refreshSite() {
@@ -245,9 +292,10 @@ async function handleMarkdown(chatId, doc, caption) {
   const buf = await downloadFile(doc.file_id, MAX_MD_BYTES);
   if (!buf) return send(chatId, "❌ 文件拉不下来（或超过 1MB），再发一次试试");
 
-  const md = buf.toString("utf8");
-  const checked = checkFrontmatter(md);
-  if (checked.error) return send(chatId, "⚠️ " + checked.error);
+  const fallbackTitle = String(doc.file_name || "未命名")
+    .replace(/\.md$/i, "")
+    .replace(/[.\s]+$/, "");
+  const { md, title, added } = ensureFrontmatter(buf.toString("utf8"), fallbackTitle);
 
   const slug = toSlug(caption) || toSlug(doc.file_name) || timestampSlug();
   const target = join(POSTS_DIR, `${slug}.md`);
@@ -263,8 +311,9 @@ async function handleMarkdown(chatId, doc, caption) {
   return send(
     chatId,
     [
-      `${isUpdate ? "♻️ 已更新" : "🎉 已发布"}《${checked.title}》`,
+      `${isUpdate ? "♻️ 已更新" : "🎉 已发布"}《${title}》`,
       `${SITE_ORIGIN}/blog/${slug}`,
+      added.length ? `已自动补 frontmatter：${added.join("、")}（重发同名文件可覆盖修改）` : "",
       refreshed ? "" : "（页面刷新没成功，稍等缓存过期或喊我看看）",
     ]
       .filter(Boolean)
@@ -367,6 +416,7 @@ function helpText() {
     "🌐 小双网站管理 bot",
     "",
     "📝 发布文章：直接把 .md 文件发给我",
+    "   · 纯 md 也行，缺 frontmatter 我自动补（标题/日期/摘要）",
     "   · 文件名就是网址 slug（也可在 caption 里指定）",
     "   · 重发同名文件 = 更新文章",
     "🖼️ 传封面：直接发图片，回你 cover 路径",
@@ -446,11 +496,14 @@ async function loop() {
   }
 }
 
-if (!TOKEN || !OWNER_ID) {
-  console.error("缺 TG_BOT_TOKEN 或 TG_ALLOWED_USER_ID，bot 不启动");
-  process.exit(1);
+// 直接运行才启动主循环；被 import（比如跑测试）时不动
+if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+  if (!TOKEN || !OWNER_ID) {
+    console.error("缺 TG_BOT_TOKEN 或 TG_ALLOWED_USER_ID，bot 不启动");
+    process.exit(1);
+  }
+  loop().catch((e) => {
+    console.error("[bot] 致命错误", e);
+    process.exit(1);
+  });
 }
-loop().catch((e) => {
-  console.error("[bot] 致命错误", e);
-  process.exit(1);
-});
