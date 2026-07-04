@@ -183,17 +183,23 @@ function handleFans(chatId, text) {
 // ── 待办动作：/add、/cover 先声明，下一个文件才生效 ─────
 // 防止随手转发文件就直接上线。一次性消费，10 分钟过期。
 const PENDING_TTL_MS = 10 * 60 * 1000;
-const pending = { action: null, expires: 0 };
+const pending = { action: null, slug: null, expires: 0 };
 
-function setPending(action) {
+function setPending(action, slug = null) {
   pending.action = action;
+  pending.slug = slug;
   pending.expires = Date.now() + PENDING_TTL_MS;
 }
 
+/** 命中则消费并返回 {slug}，未命中返回 null */
 function takePending(action) {
   const hit = pending.action === action && Date.now() < pending.expires;
-  if (pending.action === action) pending.action = null;
-  return hit;
+  const slug = pending.slug;
+  if (pending.action === action) {
+    pending.action = null;
+    pending.slug = null;
+  }
+  return hit ? { slug } : null;
 }
 
 // ── 发布文章（.md 文件） ────────────────────────────────
@@ -360,38 +366,70 @@ async function handleMarkdown(chatId, doc, caption) {
   );
 }
 
-// ── 存封面图（photo 或图片文件） ────────────────────────
+// ── 给文章挂封面（photo 或图片文件） ────────────────────
 const IMG_EXT = /\.(webp|png|jpe?g|gif|avif)$/i;
 
-async function handleImage(chatId, msg, nameHint = "") {
+/** 把 cover 字段写进文章 frontmatter（有则替换，无则补在末尾） */
+function setPostCover(slug, coverPath) {
+  const target = join(POSTS_DIR, `${slug}.md`);
+  const raw = readFileSync(target, "utf8");
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return false;
+  const fm = m[1];
+  const line = `cover: "${coverPath}"`;
+  const nextFm = /^cover\s*:/m.test(fm)
+    ? fm.replace(/^cover\s*:.*$/m, line)
+    : `${fm}\n${line}`;
+  writeFileSync(target, raw.replace(m[1], nextFm), "utf8");
+  return true;
+}
+
+async function handleCoverImage(chatId, msg, slug) {
+  if (!slug) {
+    return send(chatId, "差个文章 slug ～ 发「/cover 文章slug」再发图（/posts 能看列表）");
+  }
+  if (!existsSync(join(POSTS_DIR, `${slug}.md`))) {
+    return send(chatId, `找不到文章「${slug}」～ 发 /posts 核对一下`);
+  }
+
   let fileId;
-  let name;
+  let ext;
   if (msg.photo && msg.photo.length) {
     fileId = msg.photo[msg.photo.length - 1].file_id; // 最大尺寸那张
-    name = `${toSlug(nameHint) || timestampSlug()}.jpg`;
+    ext = ".jpg";
   } else {
     const doc = msg.document;
     fileId = doc.file_id;
-    const base = basename(doc.file_name || "");
-    name = IMG_EXT.test(base)
-      ? `${toSlug(base.replace(IMG_EXT, "")) || timestampSlug()}${base.match(IMG_EXT)[0].toLowerCase()}`
-      : null;
-    if (!name) return send(chatId, "⚠️ 只收 webp / png / jpg / gif / avif 格式的图");
+    const m = basename(doc.file_name || "").match(IMG_EXT);
+    if (!m) return send(chatId, "⚠️ 只收 webp / png / jpg / gif / avif 格式的图");
+    ext = m[0].toLowerCase();
   }
 
   const buf = await downloadFile(fileId, MAX_IMG_BYTES);
   if (!buf) return send(chatId, "❌ 图片拉不下来（或超过 8MB），再发一次试试");
 
+  const name = `${slug}${ext}`;
   try {
     mkdirSync(COVERS_DIR, { recursive: true });
     writeFileSync(join(COVERS_DIR, name), buf);
+    if (!setPostCover(slug, `/blog/${name}`)) {
+      return send(chatId, "❌ 文章的 frontmatter 不太对，挂不上封面");
+    }
   } catch (e) {
-    console.error("[bot] 存图失败", e);
-    return send(chatId, "❌ 存不进去，稍后再试");
+    console.error("[bot] 挂封面失败", e);
+    return send(chatId, "❌ 没弄上，稍后再试");
   }
+
+  const refreshed = await refreshSite();
   return send(
     chatId,
-    ["🖼️ 图片存好了！frontmatter 里这样引用：", "", `cover: "/blog/${name}"`].join("\n")
+    [
+      `🖼️ 封面已挂到「${slug}」！`,
+      `${SITE_ORIGIN}/blog/${slug}`,
+      refreshed ? "" : "（页面刷新没成功，稍等缓存过期或喊我看看）",
+    ]
+      .filter(Boolean)
+      .join("\n")
   );
 }
 
@@ -459,10 +497,11 @@ function helpText() {
     "   · 或者发文件时 caption 写「/add 可选slug」一步到位",
     "   · 纯 md 也行，缺 frontmatter 我自动补（标题/日期/摘要）",
     "   · 文件名就是网址 slug，重发同名 = 更新",
-    "🖼️ 传封面：先发 /cover，再发图片，回你 cover 路径",
+    "🖼️ 挂封面：发「/cover 文章slug」再发图片",
+    "   · 图片自动存好并写进文章，页面直接更新",
     "",
     "/add    发布文章（然后发 .md 给我）",
-    "/cover  传封面图（然后发图片给我）",
+    "/cover 文章slug   给文章挂封面（然后发图给我）",
     "/fans   看各平台粉丝数",
     "/fans 小红书 6100   同步粉丝数（可一次发多行）",
     "/posts  看已发布的文章",
@@ -477,7 +516,7 @@ async function handleMessage(msg) {
 
   const caption = (msg.caption || "").trim();
 
-  // 文件：必须先 /add（文章）或 /cover（封面）声明，或在 caption 里带指令
+  // 文件：必须先 /add（文章）或 /cover slug（封面）声明，或在 caption 里带指令
   if (msg.document) {
     const name = msg.document.file_name || "";
     if (/\.md$/i.test(name)) {
@@ -490,19 +529,23 @@ async function handleMessage(msg) {
     }
     if (IMG_EXT.test(name) || (msg.document.mime_type || "").startsWith("image/")) {
       const captionCover = /^\/cover\b/.test(caption);
-      if (!captionCover && !takePending("cover")) {
-        return send(chatId, "收到图片，但没收到指令～\n先发 /cover，或在图片 caption 里写 /cover");
+      const hit = captionCover ? null : takePending("cover");
+      if (!captionCover && !hit) {
+        return send(chatId, "收到图片，但不知道给谁当封面～\n先发「/cover 文章slug」，或在图片 caption 里写");
       }
-      return handleImage(chatId, msg, captionCover ? caption.replace(/^\/cover\b/, "").trim() : caption);
+      const slug = captionCover ? caption.replace(/^\/cover\b/, "").trim() : hit.slug;
+      return handleCoverImage(chatId, msg, slug);
     }
     return send(chatId, "⚠️ 只认 .md 文章和图片～");
   }
   if (msg.photo && msg.photo.length) {
     const captionCover = /^\/cover\b/.test(caption);
-    if (!captionCover && !takePending("cover")) {
-      return send(chatId, "收到图片，但没收到指令～\n先发 /cover，或在图片 caption 里写 /cover");
+    const hit = captionCover ? null : takePending("cover");
+    if (!captionCover && !hit) {
+      return send(chatId, "收到图片，但不知道给谁当封面～\n先发「/cover 文章slug」，或在图片 caption 里写");
     }
-    return handleImage(chatId, msg, captionCover ? caption.replace(/^\/cover\b/, "").trim() : caption);
+    const slug = captionCover ? caption.replace(/^\/cover\b/, "").trim() : hit.slug;
+    return handleCoverImage(chatId, msg, slug);
   }
 
   const text = (msg.text || "").trim();
@@ -513,8 +556,22 @@ async function handleMessage(msg) {
     return send(chatId, "📮 来吧，把 .md 文件发给我（10 分钟内有效）\n想自定义网址就在文件 caption 里写 slug");
   }
   if (text === "/cover" || text.startsWith("/cover ")) {
-    setPending("cover");
-    return send(chatId, "🖼️ 来吧，把封面图发给我（10 分钟内有效）");
+    const slug = text.replace(/^\/cover\b/, "").trim();
+    if (!slug) {
+      let hint = "";
+      try {
+        const slugs = readdirSync(POSTS_DIR)
+          .filter((f) => f.endsWith(".md"))
+          .map((f) => `· /cover ${f.replace(/\.md$/, "")}`);
+        if (slugs.length) hint = "\n\n要给哪篇？点一个：\n" + slugs.join("\n");
+      } catch (_) {}
+      return send(chatId, "格式：/cover 文章slug，然后把图发给我" + hint);
+    }
+    if (!existsSync(join(POSTS_DIR, `${slug}.md`))) {
+      return send(chatId, `找不到文章「${slug}」～ 发 /posts 核对一下`);
+    }
+    setPending("cover", slug);
+    return send(chatId, `🖼️ 来吧，把「${slug}」的封面图发给我（10 分钟内有效）`);
   }
   if (text === "/posts") return handlePosts(chatId);
   if (text === "/del" || text.startsWith("/del ")) return handleDel(chatId, text);
