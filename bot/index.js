@@ -197,12 +197,16 @@ function takePending(action) {
 }
 
 // ── 发布文章（.md 文件） ────────────────────────────────
-/** 文件名 / caption → 合法 slug；中文等非法字符会被剔掉，剔空则退回时间戳 */
+/**
+ * 文件名 / caption → slug。保留中文等 Unicode 字母数字（URL 合法，
+ * 也避免「中文剥掉后不同文章撞同一个 slug 被覆盖」），
+ * 空格标点统一成连字符，全剔空则退回时间戳。
+ */
 function toSlug(raw) {
   const s = String(raw || "")
     .toLowerCase()
     .replace(/\.md$/i, "")
-    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 64);
   return s || null;
@@ -397,8 +401,9 @@ async function handleDel(chatId, text) {
   const [rawSlug, confirm] = args;
   if (!rawSlug) return send(chatId, "格式：/del 文章slug\n先发 /posts 看看都有哪些");
 
-  // slug 只可能是 toSlug 产出的字符集，其余一律拒绝，杜绝路径逃逸
-  if (!/^[a-z0-9-]+$/.test(rawSlug)) return send(chatId, `⚠️ 没有这样的 slug「${rawSlug}」`);
+  // slug 只可能是 toSlug 产出的字符集（Unicode 字母数字 + 连字符），
+  // 其余一律拒绝，杜绝路径逃逸
+  if (!/^[\p{L}\p{N}-]+$/u.test(rawSlug)) return send(chatId, `⚠️ 没有这样的 slug「${rawSlug}」`);
   const target = join(POSTS_DIR, `${rawSlug}.md`);
   if (!existsSync(target)) {
     return send(chatId, `找不到「${rawSlug}」～ 发 /posts 核对一下`);
