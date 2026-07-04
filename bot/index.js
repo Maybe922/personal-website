@@ -180,6 +180,22 @@ function handleFans(chatId, text) {
   }
 }
 
+// ── 待办动作：/add、/cover 先声明，下一个文件才生效 ─────
+// 防止随手转发文件就直接上线。一次性消费，10 分钟过期。
+const PENDING_TTL_MS = 10 * 60 * 1000;
+const pending = { action: null, expires: 0 };
+
+function setPending(action) {
+  pending.action = action;
+  pending.expires = Date.now() + PENDING_TTL_MS;
+}
+
+function takePending(action) {
+  const hit = pending.action === action && Date.now() < pending.expires;
+  if (pending.action === action) pending.action = null;
+  return hit;
+}
+
 // ── 发布文章（.md 文件） ────────────────────────────────
 /** 文件名 / caption → 合法 slug；中文等非法字符会被剔掉，剔空则退回时间戳 */
 function toSlug(raw) {
@@ -343,12 +359,12 @@ async function handleMarkdown(chatId, doc, caption) {
 // ── 存封面图（photo 或图片文件） ────────────────────────
 const IMG_EXT = /\.(webp|png|jpe?g|gif|avif)$/i;
 
-async function handleImage(chatId, msg) {
+async function handleImage(chatId, msg, nameHint = "") {
   let fileId;
   let name;
   if (msg.photo && msg.photo.length) {
     fileId = msg.photo[msg.photo.length - 1].file_id; // 最大尺寸那张
-    name = `${toSlug(msg.caption) || timestampSlug()}.jpg`;
+    name = `${toSlug(nameHint) || timestampSlug()}.jpg`;
   } else {
     const doc = msg.document;
     fileId = doc.file_id;
@@ -434,13 +450,14 @@ function helpText() {
   return [
     "🌐 小双网站管理 bot",
     "",
-    "📝 发布文章：直接把 .md 文件发给我",
+    "📝 发布文章：先发 /add，再把 .md 文件发给我",
+    "   · 或者发文件时 caption 写「/add 可选slug」一步到位",
     "   · 纯 md 也行，缺 frontmatter 我自动补（标题/日期/摘要）",
-    "   · 文件名就是网址 slug（也可在 caption 里指定）",
-    "   · 重发同名文件 = 更新文章",
-    "🖼️ 传封面：直接发图片，回你 cover 路径",
-    "   · caption 写英文名可自定义文件名",
+    "   · 文件名就是网址 slug，重发同名 = 更新",
+    "🖼️ 传封面：先发 /cover，再发图片，回你 cover 路径",
     "",
+    "/add    发布文章（然后发 .md 给我）",
+    "/cover  传封面图（然后发图片给我）",
     "/fans   看各平台粉丝数",
     "/fans 小红书 6100   同步粉丝数（可一次发多行）",
     "/posts  看已发布的文章",
@@ -453,26 +470,53 @@ async function handleMessage(msg) {
   const chatId = msg.chat && msg.chat.id;
   if (!chatId) return;
 
-  // 文件优先：md 发布 / 图片存封面
+  const caption = (msg.caption || "").trim();
+
+  // 文件：必须先 /add（文章）或 /cover（封面）声明，或在 caption 里带指令
   if (msg.document) {
     const name = msg.document.file_name || "";
-    if (/\.md$/i.test(name)) return handleMarkdown(chatId, msg.document, msg.caption);
+    if (/\.md$/i.test(name)) {
+      const captionAdd = /^\/add\b/.test(caption);
+      if (!captionAdd && !takePending("add")) {
+        return send(chatId, "收到文件，但没收到发布指令～\n先发 /add，或在文件 caption 里写「/add 可选slug」");
+      }
+      const slugHint = captionAdd ? caption.replace(/^\/add\b/, "").trim() : caption;
+      return handleMarkdown(chatId, msg.document, slugHint);
+    }
     if (IMG_EXT.test(name) || (msg.document.mime_type || "").startsWith("image/")) {
-      return handleImage(chatId, msg);
+      const captionCover = /^\/cover\b/.test(caption);
+      if (!captionCover && !takePending("cover")) {
+        return send(chatId, "收到图片，但没收到指令～\n先发 /cover，或在图片 caption 里写 /cover");
+      }
+      return handleImage(chatId, msg, captionCover ? caption.replace(/^\/cover\b/, "").trim() : caption);
     }
     return send(chatId, "⚠️ 只认 .md 文章和图片～");
   }
-  if (msg.photo && msg.photo.length) return handleImage(chatId, msg);
+  if (msg.photo && msg.photo.length) {
+    const captionCover = /^\/cover\b/.test(caption);
+    if (!captionCover && !takePending("cover")) {
+      return send(chatId, "收到图片，但没收到指令～\n先发 /cover，或在图片 caption 里写 /cover");
+    }
+    return handleImage(chatId, msg, captionCover ? caption.replace(/^\/cover\b/, "").trim() : caption);
+  }
 
   const text = (msg.text || "").trim();
   if (!text) return;
   if (text === "/start" || text === "/help") return send(chatId, helpText());
+  if (text === "/add" || text.startsWith("/add ")) {
+    setPending("add");
+    return send(chatId, "📮 来吧，把 .md 文件发给我（10 分钟内有效）\n想自定义网址就在文件 caption 里写 slug");
+  }
+  if (text === "/cover" || text.startsWith("/cover ")) {
+    setPending("cover");
+    return send(chatId, "🖼️ 来吧，把封面图发给我（10 分钟内有效）");
+  }
   if (text === "/posts") return handlePosts(chatId);
   if (text === "/del" || text.startsWith("/del ")) return handleDel(chatId, text);
   if (text === "/fans" || text.startsWith("/fans ") || text.startsWith("/fans\n")) {
     return handleFans(chatId, text);
   }
-  return send(chatId, "发 .md 文件给我就能发布文章～\n\n" + helpText());
+  return send(chatId, "发 /add 再把 .md 发给我，就能发布文章～\n\n" + helpText());
 }
 
 // ── 主循环 ──────────────────────────────────────────────
