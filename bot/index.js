@@ -412,7 +412,8 @@ async function handleCoverImage(chatId, msg, slug) {
   try {
     mkdirSync(COVERS_DIR, { recursive: true });
     writeFileSync(join(COVERS_DIR, name), buf);
-    if (!setPostCover(slug, `/blog/${name}`)) {
+    // 走运行时路由 /blog-assets/：Next 不服务 build 后新增的 public 文件
+    if (!setPostCover(slug, `/blog-assets/${name}`)) {
       return send(chatId, "❌ 文章的 frontmatter 不太对，挂不上封面");
     }
   } catch (e) {
