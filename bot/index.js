@@ -264,13 +264,15 @@ export function ensureFrontmatter(md, fallbackTitle) {
     return { md: `---\n${fm}\n${extra}---\n${body}`, title, added };
   }
 
-  // 完全没有 frontmatter：标题取第一个 # 大标题（并从正文去掉，免得页面标题重复）
+  // 完全没有 frontmatter：只有当文档第一行就是 # 大标题、且不是
+  // 「# 1. xxx」这类编号小节时，才把它当文章标题（并从正文去掉，
+  // 免得页面标题重复）；其余情况标题用文件名，正文一个字不动。
   let body = md;
   let title = fallbackTitle;
-  const h1 = body.match(/^\s*#\s+(.+?)\s*$/m);
-  if (h1) {
+  const h1 = body.match(/^\s*#[ \t]+(.+?)[ \t]*(?:\r?\n|$)/);
+  if (h1 && !/^\d+[.、)]/.test(h1[1])) {
     title = h1[1].trim();
-    body = body.replace(h1[0], "").replace(/^\s+/, "");
+    body = body.slice(h1[0].length).replace(/^\s+/, "");
   }
   // 摘要会在页面上当开头导语展示；整句抽走时从正文删掉，免得连着念两遍
   const excerpt = extractExcerpt(body);
