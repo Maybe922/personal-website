@@ -3,8 +3,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getAllPosts, getPostBySlug } from "@/lib/posts";
+import { extractHeadings } from "@/lib/toc";
 import { BlogCorners } from "@/components/blog/BlogCorners";
 import { MarkdownBody } from "@/components/blog/MarkdownBody";
+import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SiteFooter } from "@/components/footer/SiteFooter";
 import { ArrowRight } from "@/components/icons";
 
@@ -52,10 +54,13 @@ export default async function BlogPost({
 
   if (!post) notFound();
 
+  const headings = extractHeadings(post.content);
+
   return (
     <>
       <main className="dot-grid relative z-10">
         <BlogCorners backHref="/blog" backLabel="返回日志本" />
+        {headings.length >= 2 ? <TableOfContents headings={headings} /> : null}
 
         <article className="mx-auto max-w-3xl px-5 pt-28 sm:pt-32">
           <header className="border-b border-dashed border-ink/20 pb-8">

@@ -4,20 +4,32 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
+import { headingId } from "@/lib/toc";
 
 type Props = {
   content: string;
 };
 
-/** 标题文字包一层 inline span，荧光笔逐行贴着文字画（折行也好看） */
+/** React 子节点拍平成纯文本，用来算与目录一致的锚点 id */
+function toText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(toText).join("");
+  if (typeof node === "object" && "props" in node) {
+    return toText((node.props as { children?: ReactNode }).children);
+  }
+  return "";
+}
+
+/** 标题：带锚点 id（右侧目录跳转用）+ inline span 荧光笔逐行贴字 */
 const components = {
   h1: ({ children }: { children?: ReactNode }) => (
-    <h1>
+    <h1 id={headingId(toText(children))}>
       <span className="heading-mark">{children}</span>
     </h1>
   ),
   h2: ({ children }: { children?: ReactNode }) => (
-    <h2>
+    <h2 id={headingId(toText(children))}>
       <span className="heading-mark">{children}</span>
     </h2>
   ),
