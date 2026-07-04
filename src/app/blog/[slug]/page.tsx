@@ -114,12 +114,6 @@ export default async function BlogPost({
             </div>
           </div>
 
-          {/* 写完收工贴纸 */}
-          <div className="flex justify-center pb-12">
-            <span className="inline-block rotate-3 rounded-md bg-grass/55 px-3 py-1 font-display text-sm font-bold text-ink shadow-soft">
-              ✓ 写完收工
-            </span>
-          </div>
         </article>
 
         <div className="mx-auto max-w-3xl px-5 pb-24">
