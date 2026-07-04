@@ -121,8 +121,9 @@ export const projects: Project[] = [
     name: "TeamSpeak 一键开黑服",
     blurb:
       "一条命令拉起自己的 TeamSpeak 语音服务器：频道、权限、管理 bot 全自动配好，和朋友开黑不再求人。",
-    status: "building",
+    status: "live",
     tags: ["TeamSpeak", "Bot", "一键部署"],
+    href: "https://github.com/Maybe922/ts3-server-bot",
     period: "2026",
     cover: "/projects/ts3.webp",
     coverAlt: "小双戴着游戏耳机按下一个大按钮，旁边的服务器机箱里探出机器人，头顶飘着几个语音气泡",
