@@ -21,8 +21,9 @@ export async function generateMetadata({
 }: {
   params: Promise<PageParams>;
 }): Promise<Metadata> {
+  // 中文 slug 到达时是百分号编码，先解码再找文章
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = getPostBySlug(decodeURIComponent(slug));
   if (!post) return { title: "文章未找到" };
   return {
     title: post.title,
@@ -50,7 +51,7 @@ export default async function BlogPost({
   params: Promise<PageParams>;
 }) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = getPostBySlug(decodeURIComponent(slug));
 
   if (!post) notFound();
 
