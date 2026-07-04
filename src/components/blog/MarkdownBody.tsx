@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 
@@ -26,9 +27,11 @@ const components = {
 export function MarkdownBody({ content }: Props) {
   return (
     <div className="post-body">
+      {/* rehype-raw：渲染 Obsidian 笔记里的内联 HTML（如 <font>）。
+          博客仅站主经 bot 发布，无外部输入，不需要 sanitize */}
       <Markdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[rehypeRaw, rehypeHighlight]}
         components={components}
       >
         {content}
