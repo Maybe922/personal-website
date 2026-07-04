@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getAllPosts, getPostBySlug } from "@/lib/posts";
@@ -8,7 +7,6 @@ import { BlogCorners } from "@/components/blog/BlogCorners";
 import { MarkdownBody } from "@/components/blog/MarkdownBody";
 import { TableOfContents } from "@/components/blog/TableOfContents";
 import { SiteFooter } from "@/components/footer/SiteFooter";
-import { ArrowRight } from "@/components/icons";
 
 type PageParams = { slug: string };
 
@@ -117,30 +115,6 @@ export default async function BlogPost({
 
         </article>
 
-        <div className="mx-auto max-w-3xl px-5 pb-24">
-          <Link
-            href="/blog"
-            className="group block rounded-[1.25rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grass focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-          >
-            <div className="relative -rotate-1 transition-transform duration-300 ease-out group-hover:rotate-0 group-hover:-translate-y-1">
-              <span
-                aria-hidden
-                className="absolute -top-2.5 left-8 z-10 h-6 w-20 -rotate-3 rounded-[2px] bg-grass/35"
-              />
-              <div className="flex items-center justify-between rounded-[1.25rem] border border-hair bg-surface p-6 shadow-soft transition-shadow duration-300 group-hover:shadow-lift">
-                <span>
-                  <span className="font-mono text-xs uppercase tracking-wide text-ink-faint">
-                    继续读
-                  </span>
-                  <span className="mt-1 block font-display text-lg font-semibold text-ink">
-                    回到日志本
-                  </span>
-                </span>
-                <ArrowRight className="size-5 text-grass-deep transition-transform duration-300 group-hover:translate-x-1" />
-              </div>
-            </div>
-          </Link>
-        </div>
       </main>
       <SiteFooter />
     </>
